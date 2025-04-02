@@ -65,19 +65,45 @@ pub struct InstanceDecl {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Bind {
+pub struct Bind {   // binds a parameter to an argument
     pub name: Identifier,
     pub value: Expression
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct GenerateBlock {
-    pub name: Identifier,
     pub body: Vec<Statement>
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ForBlock {
-    pub name: Identifier,
+    pub name: Option<Identifier>,
+    pub init: AssignDecl,
+    pub cond: Expression,
+    pub step: AssignDecl,
     pub body: Vec<Statement>
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum Expression {
+    Identifier(Identifier),
+    ConstantInt(i64),
+    String(String),
+    BinaryOp(Box<Expression>, Operator, Box<Expression>),
+    UnaryOp(Operator, Box<Expression>),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum Operator {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    And,
+    Or,
+    Xor,
+    Not,
+    Shl,
+    Shr
 }
