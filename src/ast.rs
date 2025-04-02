@@ -89,21 +89,41 @@ pub enum Expression {
     Identifier(Identifier),
     ConstantInt(i64),
     String(String),
-    BinaryOp(Box<Expression>, Operator, Box<Expression>),
-    UnaryOp(Operator, Box<Expression>),
+    BinaryBitOperation(Box<Expression>, BinBitOp, Box<Expression>),
+    UnaryBitOperation(UnBitOp, Box<Expression>),
+    BinaryArithmeticOperation(Box<Expression>, BinArithOp, Box<Expression>),
+    UnaryArithmeticOperation(UnArithOp, Box<Expression>)
+    // TODO: add more expression types, e.g. logic operations, concatenation, etc.
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum Operator {
+pub enum BinBitOp {
+    And,
+    Or,
+    Xor,
+    Xnor
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum UnBitOp {
+    Not
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum BinArithOp {
     Add,
     Sub,
     Mul,
     Div,
-    Mod,
-    And,
-    Or,
-    Xor,
-    Not,
-    Shl,
-    Shr
+    Mod
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum UnArithOp {
+    Neg
+}
+
+// Implementations
+impl Module {
+    pub fn 
 }

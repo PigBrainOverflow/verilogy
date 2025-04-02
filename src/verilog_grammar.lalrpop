@@ -33,9 +33,22 @@ Pipe<T>: Vec<T> = {
     }
 };
 
-pub Code: ast::Code = {
-    <m:Toplevel+> => ast::Code(m),
+
+pub TranslationUnit: ast::TranslationUnit = {
+    <m:Module+> => ast::TranslationUnit{modules: m}
 };
+
+Module: ast::Module = {
+    "module" <id:Identifier> <pa:ParameterSignature?> <po:PortSignature> ";" <b:ModuleBody> "endmodule" => {
+        
+    }
+};
+
+
+
+
+
+
 
 Toplevel: ast::Toplevel = {
     "module" <i:Ident> "(" <a:EntityArgs> ")" ";" <b:EntityBody> "endmodule" => {
