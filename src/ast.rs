@@ -1,3 +1,4 @@
+// Simplified AST
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct TranslationUnit {
     pub modules: Vec<Module>
@@ -21,20 +22,32 @@ pub struct Parameter {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Statement {
-    Wire(WireDecl),
-    Assign(AssignDecl),
-    Instance(InstanceDecl),
-    Generate(GenerateBlock),
-    For(ForBlock),
+    Wire {
+        pub name: Identifier,
+        pub width: Option<Range>,
+        pub init: Option<Expression>,
+        pub io: Option<Direction>
+    },
+    Assign {
+        pub lhs: Identifier,
+        pub width: Option<Range>,
+        pub rhs: Expression
+    },
+    Instance {
+        pub name: Identifier,
+        pub module: Identifier,
+        pub params_set: Vec<Bind>,
+        pub ports_set: Vec<Bind>
+    },
+    Generate(pub Vec<Statement>),
+    For {
+        pub name: Option<Identifier>,
+        pub init: AssignDecl,
+        pub cond: Expression,
+        pub step: AssignDecl,
+        pub body: Vec<Statement>
+    }
     // TODO: add more statement types
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct WireDecl {
-    pub name: Identifier,
-    pub width: Option<Range>,
-    pub init: Option<Expression>,
-    pub io: Option<Direction>
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -51,37 +64,9 @@ pub struct Range {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct AssignDecl {
-    pub lhs: Expression,
-    pub rhs: Expression
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct InstanceDecl {
-    pub name: Identifier,
-    pub module: Identifier,
-    pub params_set: Vec<Bind>,
-    pub ports_set: Vec<Bind>
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Bind {   // binds a parameter to an argument
     pub name: Identifier,
     pub value: Expression
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct GenerateBlock {
-    pub body: Vec<Statement>
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct ForBlock {
-    pub name: Option<Identifier>,
-    pub init: AssignDecl,
-    pub cond: Expression,
-    pub step: AssignDecl,
-    pub body: Vec<Statement>
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -125,5 +110,37 @@ pub enum UnArithOp {
 
 // Implementations
 impl Module {
-    pub fn 
+    pub fn with_def(id: Identifier, params: Option<ParameterSignature>, ports: Vec<Port>, body: Vec<Statement>) -> Self {
+        let mut params = params.unwrap_or(ParameterSignature(vec![]));
+        let mut body = body;
+
+        // Add ports to the body
+        for port in ports {
+            let port_decl = Statement::Wire(WireDecl {
+                name: port.name,
+                width: port.width,
+                init: None,
+                io: Some(port.io.unwrap_or(Direction::Input))
+            });
+            body.insert(0, port_decl);
+        }
+
+        Module {
+            name: id,
+            params: params.0,
+            body
+        }
+    }
+}
+
+// Original AST
+// not occurring in the output AST
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct ParameterSignature(pub Vec<Parameter>);
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct Port {
+    pub name: Identifier,
+    pub width: Option<Range>,
+    pub io: Direction
 }

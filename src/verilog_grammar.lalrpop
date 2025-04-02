@@ -39,13 +39,27 @@ pub TranslationUnit: ast::TranslationUnit = {
 };
 
 Module: ast::Module = {
-    "module" <id:Identifier> <pa:ParameterSignature?> <po:PortSignature> ";" <b:ModuleBody> "endmodule" => {
-        
-    }
+    "module" <id:Identifier> <pa:ParameterSignature?> "(" <po:Comma<Port>> ")" ";" <b:Semicolon<Statement>> "endmodule" => ast::Module::with_def(id, pa, po, b)
 };
 
+Port: ast::Port = {
+    "input" <r:Range?> <id:Identifier> => ast::Port{name: id, width: r, io: ast::Direction::Input},
+    "output" <r:Range?> <id:Identifier> => ast::Port{name: id, width: r, io: ast::Direction::Output},
+    "inout" <r:Range?> <id:Identifier> => ast::Port{name: id, width: r, io: ast::Direction::InOut}
+};
 
+Identifier: ast::Identifier = {
+    r"[a-zA-Z_][0-9A-Za-z_]*" => ast::Identifier(<>.to_string())
+};
 
+ParameterSignature: ast::ParameterSignature = {
+    "#(" <ps:Comma<Parameter>> ")" => ast::ParameterSignature{params: ps}
+};
+
+Statement: ast::Statement = {
+    "wire" <r:Range?> <id:Identifier> => ast::Statement::Wire(id, r),
+    
+};
 
 
 
