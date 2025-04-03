@@ -1,5 +1,5 @@
 use lalrpop_util::lalrpop_mod;
-lalrpop_mod!(pub parser); // synthesized
+lalrpop_mod!(pub verilog_grammar); // synthesized
 
 pub mod ast;
 pub mod parser;

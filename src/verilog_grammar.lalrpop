@@ -1,5 +1,4 @@
-use std::str::FromStr;
-use ast;
+use super::ast;
 
 #[LALR] grammar;
 
@@ -53,14 +52,14 @@ Identifier: ast::Identifier = {
 };
 
 ParameterSignature: ast::ParameterSignature = {
-    "#" "(" <ps:Comma<Parameter>> ")" => ast::ParameterSignature{params: ps}
+    "#" "(" <ps:Comma<Parameter>> ")" => ast::ParameterSignature(ps)
 };
 
 Statement: ast::Statement = {
-    "wire" <r:Range?> <id:Identifier> <e:Expression?> => ast::Statement::Wire{name: id, width: r, value: e, io: None},
-    "assign" <id:Identifier> <r:Range?> "=" <e:Expression> ";" => ast::Statement::Assign{lhs: id, width: r, rhs: e},
-    <idm:Identifier> <idi:Identifier> "(" <pos:Comma<Bind>> ")" ";" => ast::Statement::Instance{name: idi, module: idm, params_set: Vec<Bind>::new(), ports_set: pos},
-    <idm:Identifier> "#" "(" <pas:Comma<Parameter>> ")" <idi:Identifier> "(" <pos:Comma<Bind>> ")" ";" => ast::Statement::Instance{name: idi, module: idm, params_set: pas, ports_set: pos}
+    "wire" <r:Range?> <id:Identifier> <e:Expression?> => ast::Statement::Wire{name: id, width: r, init: e, io: None},
+    "assign" <id:Identifier> <r:Range?> "=" <e:Expression> ";" => ast::Statement::Assign(AssignDecl{name: id, width: r, value: e})
+    <idm:Identifier> <idi:Identifier> "(" <pos:Comma<Bind>> ")" ";" => ast::Statement::Instance{name: idi, module: idm, params_set: vec![], ports_set: pos},
+    <idm:Identifier> "#" "(" <pas:Comma<Bind>> ")" <idi:Identifier> "(" <pos:Comma<Bind>> ")" ";" => ast::Statement::Instance{name: idi, module: idm, params_set: pas, ports_set: pos}
 };
 
 Bind: ast::Bind = {
@@ -68,23 +67,37 @@ Bind: ast::Bind = {
 };
 
 Expression: ast::Expression = {
+    #[precedence(level="0")]
     <id:Identifier> => ast::Expression::Identifier(id),
     r"-?[0-9]+" => ast::Expression::with_constant(<>),
-    <lhs:Expression> "&" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::And, Box::new(rhs)),
-    <lhs:Expression> "|" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::Or, Box::new(rhs)),
-    <lhs:Expression> "^" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::Xor, Box::new(rhs)),
-    <lhs:Expression> "^~" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::Xnor, Box::new(rhs)),
-    <lhs:Expression> "+" <rhs:Expression> => ast::Expression::BinaryArithmeticOperation(Box::new(lhs), ast::BinArithOp::Add, Box::new(rhs)),
-    <lhs:Expression> "-" <rhs:Expression> => ast::Expression::BinaryArithmeticOperation(Box::new(lhs), ast::BinArithOp::Sub, Box::new(rhs)),
+    <e:Expression> <r:Range> => ast::Expression::Slice(Box::new(e), r),
+
+    #[precedence(level="1")] #[assoc(side="right")]
+    "~" <e:Expression> => ast::Expression::UnaryBitOperation(ast::UnBitOp::Not, Box::new(e)),
+    "-" <e:Expression> => ast::Expression::UnaryArithmeticOperation(ast::UnArithOp::Neg, Box::new(e)),
+
+    #[precedence(level="2")] #[assoc(side="left")]
     <lhs:Expression> "*" <rhs:Expression> => ast::Expression::BinaryArithmeticOperation(Box::new(lhs), ast::BinArithOp::Mul, Box::new(rhs)),
     <lhs:Expression> "/" <rhs:Expression> => ast::Expression::BinaryArithmeticOperation(Box::new(lhs), ast::BinArithOp::Div, Box::new(rhs)),
     <lhs:Expression> "%" <rhs:Expression> => ast::Expression::BinaryArithmeticOperation(Box::new(lhs), ast::BinArithOp::Mod, Box::new(rhs)),
-    "~" <e:Expression> => ast::Expression::UnaryBitOperation(ast::UnBitOp::Not, Box::new(e)),
-    "-" <e:Expression> => ast::Expression::UnaryArithmeticOperation(ast::UnArithOp::Neg, Box::new(e))
-    <e:Expression> <r:Range> => ast::Expression::Slice(Box::new(e), r)
+
+    #[precedence(level="3")] #[assoc(side="left")]
+    <lhs:Expression> "+" <rhs:Expression> => ast::Expression::BinaryArithmeticOperation(Box::new(lhs), ast::BinArithOp::Add, Box::new(rhs)),
+    <lhs:Expression> "-" <rhs:Expression> => ast::Expression::BinaryArithmeticOperation(Box::new(lhs), ast::BinArithOp::Sub, Box::new(rhs)),
+
+    #[precedence(level="4")] #[assoc(side="left")]
+    <lhs:Expression> "&" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::And, Box::new(rhs)),
+    <lhs:Expression> "|" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::Or, Box::new(rhs)),
+    <lhs:Expression> "^" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::Xor, Box::new(rhs)),
+    <lhs:Expression> "^~" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::Xnor, Box::new(rhs))
 };
 
 Range: ast::Range = {
-    "[" <start:Expression> "]" => ast::Range{start: start, end: None},
-    "[" <start:Expression> ":" <end:Expression> "]" => ast::Range{start: start, end: Some(end)}
+    "[" <start:Expression> "]" => ast::Range{start: Box::new(start), end: None},
+    "[" <start:Expression> ":" <end:Expression> "]" => ast::Range{start: Box::new(start), end: Some(Box::new(end))}
+};
+
+Parameter: ast::Parameter = {
+    <id:Identifier> "=" <e:Expression> => ast::Parameter{name: id, value: Some(e)},
+    <id:Identifier> => ast::Parameter{name: id, value: None}
 };

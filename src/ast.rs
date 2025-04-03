@@ -23,44 +23,47 @@ pub struct Parameter {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Statement {
     Wire {
-        pub name: Identifier,
-        pub width: Option<Range>,
-        pub init: Option<Expression>,
-        pub io: Option<Direction>
+        name: Identifier,
+        width: Option<Range>,
+        init: Option<Expression>,
+        io: Option<Direction>
     },
-    Assign {
-        pub lhs: Identifier,
-        pub width: Option<Range>,
-        pub rhs: Expression
-    },
+    Assign(AssignDecl),
     Instance {
-        pub name: Identifier,
-        pub module: Identifier,
-        pub params_set: Vec<Bind>,
-        pub ports_set: Vec<Bind>
+        name: Identifier,
+        module: Identifier,
+        params_set: Vec<Bind>,
+        ports_set: Vec<Bind>
     },
-    Generate(pub Vec<Statement>),
+    Generate(Vec<Statement>),
     For {
-        pub name: Option<Identifier>,
-        pub init: AssignDecl,
-        pub cond: Expression,
-        pub step: AssignDecl,
-        pub body: Vec<Statement>
+        name: Option<Identifier>,
+        init: AssignDecl,
+        cond: Expression,
+        step: AssignDecl,
+        body: Vec<Statement>
     }
     // TODO: add more statement types
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct AssignDecl {
+    pub name: Identifier,
+    pub width: Option<Range>,
+    pub value: Expression
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Direction {
     Input,
     Output,
-    Inout
+    InOut
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Range {
-    pub start: Expression,
-    pub end: Option<Expression>
+    pub start: Box<Expression>,
+    pub end: Option<Box<Expression>>
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -110,26 +113,17 @@ pub enum UnArithOp {
 
 // Implementations
 impl Module {
-    pub fn with_def(id: Identifier, params: Option<ParameterSignature>, ports: Vec<Port>, body: Vec<Statement>) -> Self {
-        let mut params = params.unwrap_or(ParameterSignature(vec![]));
-        let mut body = body;
+    pub fn with_def(id: Identifier, params: Option<ParameterSignature>, ports: Vec<Port>, mut body: Vec<Statement>) -> Self {
+        let params = params.unwrap_or(ParameterSignature(vec![]));
+        let mut new_body = vec![];
 
-        // Add ports to the body
+        // add ports to the body
         for port in ports {
-            let port_decl = Statement::Wire(WireDecl {
-                name: port.name,
-                width: port.width,
-                init: None,
-                io: Some(port.io.unwrap_or(Direction::Input))
-            });
-            body.insert(0, port_decl);
+            new_body.push(Statement::Wire{name: port.name, width: port.width, init: None, io: Some(port.io)});
         }
+        new_body.append(&mut body);
 
-        Module {
-            name: id,
-            params: params.0,
-            body
-        }
+        Self{name: id, params: params.0, body}
     }
 }
 
