@@ -8,4 +8,4 @@ license = "MIT OR Apache-2.0"
 lalrpop = "0.22.1"
 
 [dependencies]
-lalrpop-util = "0.22.1"
+lalrpop-util = { version = "0.22.1", features = ["lexer", "unicode"] }

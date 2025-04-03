@@ -1,10 +1,12 @@
 use std::io::{BufReader, Read, BufRead};
 
+#[allow(dead_code)]
 struct Preprocessor {
     cwd: String,
     inc_dirs: Vec<String>
 }
 
+#[allow(dead_code)]
 impl Preprocessor {
     pub fn new(cwd: &str) -> Self {
         Self {

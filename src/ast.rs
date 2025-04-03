@@ -123,7 +123,7 @@ impl Module {
         }
         new_body.append(&mut body);
 
-        Self{name: id, params: params.0, body}
+        Self{name: id, params: params.0, body: new_body}
     }
 }
 

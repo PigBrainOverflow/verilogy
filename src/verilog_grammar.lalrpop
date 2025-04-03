@@ -6,6 +6,7 @@ Comma<T>: Vec<T> = {
     <v:(<T> ",")*> <e:T?> => match e {
         None => v,
         Some(e) => {
+            let mut v = v;
             v.push(e);
             v
         }
@@ -16,6 +17,7 @@ Semicolon<T>: Vec<T> = {
     <v:(<T> ";")*> <e:T?> => match e {
         None => v,
         Some(e) => {
+            let mut v = v;
             v.push(e);
             v
         }
@@ -26,6 +28,7 @@ Pipe<T>: Vec<T> = {
     <v:(<T> "|")*> <e:T?> => match e {
         None => v,
         Some(e) => {
+            let mut v = v;
             v.push(e);
             v
         }
@@ -57,7 +60,7 @@ ParameterSignature: ast::ParameterSignature = {
 
 Statement: ast::Statement = {
     "wire" <r:Range?> <id:Identifier> <e:Expression?> => ast::Statement::Wire{name: id, width: r, init: e, io: None},
-    "assign" <id:Identifier> <r:Range?> "=" <e:Expression> ";" => ast::Statement::Assign(AssignDecl{name: id, width: r, value: e})
+    "assign" <id:Identifier> <r:Range?> "=" <e:Expression> ";" => ast::Statement::Assign(ast::AssignDecl{name: id, width: r, value: e}),
     <idm:Identifier> <idi:Identifier> "(" <pos:Comma<Bind>> ")" ";" => ast::Statement::Instance{name: idi, module: idm, params_set: vec![], ports_set: pos},
     <idm:Identifier> "#" "(" <pas:Comma<Bind>> ")" <idi:Identifier> "(" <pos:Comma<Bind>> ")" ";" => ast::Statement::Instance{name: idi, module: idm, params_set: pas, ports_set: pos}
 };
