@@ -1,9 +1,9 @@
-use std::io::{BufReader, Read, BufRead};
+use std::io::{BufRead, BufReader, Read};
 
 #[allow(dead_code)]
 struct Preprocessor {
     cwd: String,
-    inc_dirs: Vec<String>
+    inc_dirs: Vec<String>,
 }
 
 #[allow(dead_code)]
@@ -11,7 +11,7 @@ impl Preprocessor {
     pub fn new(cwd: &str) -> Self {
         Self {
             cwd: String::from(cwd),
-            inc_dirs: Vec::new()
+            inc_dirs: Vec::new(),
         }
     }
 
@@ -52,10 +52,13 @@ impl Preprocessor {
         for line in buffered_src.lines() {
             let line = line.map_err(|e| e.to_string())?;
             if line.starts_with("`include") {
-                let path = line.split_whitespace().nth(1)
+                let path = line
+                    .split_whitespace()
+                    .nth(1)
                     .ok_or("Missing path in `include directive")?;
                 let path = path.trim_matches('"');
-                let path = self.resolve_path(&path)
+                let path = self
+                    .resolve_path(&path)
                     .ok_or(format!("Failed to resolve include path: {}", path))?;
                 let mut inc_src = std::fs::File::open(&path)
                     .map_err(|e| format!("Failed to open include file: {}", e))?;
@@ -64,8 +67,7 @@ impl Preprocessor {
                 // replace the included content in the original source
                 res.push_str(&inc_content);
                 res.push('\n');
-            }
-            else {
+            } else {
                 res.push_str(&line);
                 res.push('\n');
             }

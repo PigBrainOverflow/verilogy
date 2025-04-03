@@ -13,35 +13,13 @@ Comma<T>: Vec<T> = {
     }
 };
 
-Semicolon<T>: Vec<T> = {
-    <v:(<T> ";")*> <e:T?> => match e {
-        None => v,
-        Some(e) => {
-            let mut v = v;
-            v.push(e);
-            v
-        }
-    }
-};
-
-Pipe<T>: Vec<T> = {
-    <v:(<T> "|")*> <e:T?> => match e {
-        None => v,
-        Some(e) => {
-            let mut v = v;
-            v.push(e);
-            v
-        }
-    }
-};
-
 
 pub TranslationUnit: ast::TranslationUnit = {
     <m:Module+> => ast::TranslationUnit{modules: m}
 };
 
 Module: ast::Module = {
-    "module" <id:Identifier> <pa:ParameterSignature?> "(" <po:Comma<Port>> ")" ";" <b:Semicolon<Statement>> "endmodule" => ast::Module::with_def(id, pa, po, b)
+    "module" <id:Identifier> <pa:ParameterSignature?> "(" <po:Comma<Port>> ")" ";" <b:Statement*> "endmodule" => ast::Module::with_def(id, pa, po, b)
 };
 
 Port: ast::Port = {
@@ -59,10 +37,26 @@ ParameterSignature: ast::ParameterSignature = {
 };
 
 Statement: ast::Statement = {
-    "wire" <r:Range?> <id:Identifier> <e:Expression?> => ast::Statement::Wire{name: id, width: r, init: e, io: None},
+    "wire" <r:Range?> <id:Identifier> <e:Expression?> ";" => ast::Statement::Wire{name: id, width: r, init: e, io: None},
     "assign" <id:Identifier> <r:Range?> "=" <e:Expression> ";" => ast::Statement::Assign(ast::AssignDecl{name: id, width: r, value: e}),
     <idm:Identifier> <idi:Identifier> "(" <pos:Comma<Bind>> ")" ";" => ast::Statement::Instance{name: idi, module: idm, params_set: vec![], ports_set: pos},
-    <idm:Identifier> "#" "(" <pas:Comma<Bind>> ")" <idi:Identifier> "(" <pos:Comma<Bind>> ")" ";" => ast::Statement::Instance{name: idi, module: idm, params_set: pas, ports_set: pos}
+    <idm:Identifier> "#" "(" <pas:Comma<Bind>> ")" <idi:Identifier> "(" <pos:Comma<Bind>> ")" ";" => ast::Statement::Instance{name: idi, module: idm, params_set: pas, ports_set: pos},
+    "genvar" <id:Identifier> ";" => ast::Statement::Genvar(id),
+    "generate" <b:Statement*> "endgenerate" => ast::Statement::Generate(b),
+    "for" "(" <idi:Identifier> "=" <init:Expression> ";" <cond:Expression> ";" <ids:Identifier> "=" <step:Expression> ")" "begin" <b:Statement*> "end" => ast::Statement::For{
+        name: None,
+        init: ast::AssignDecl{name: idi, width: None, value: init},
+        cond: cond,
+        step: ast::AssignDecl{name: ids, width: None, value: step},
+        body: b
+    },
+    "for" "(" <idi:Identifier> "=" <init:Expression> ";" <cond:Expression> ";" <ids:Identifier> "=" <step:Expression> ")" "begin" ":" <idf:Identifier> <b:Statement*> "end" => ast::Statement::For{
+        name: Some(idf),
+        init: ast::AssignDecl{name: idi, width: None, value: init},
+        cond: cond,
+        step: ast::AssignDecl{name: ids, width: None, value: step},
+        body: b
+    }
 };
 
 Bind: ast::Bind = {
@@ -71,6 +65,7 @@ Bind: ast::Bind = {
 
 Expression: ast::Expression = {
     #[precedence(level="0")]
+    "(" <e:Expression> ")" => e,
     <id:Identifier> => ast::Expression::Identifier(id),
     r"-?[0-9]+" => ast::Expression::with_constant(<>),
     <e:Expression> <r:Range> => ast::Expression::Slice(Box::new(e), r),
