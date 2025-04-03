@@ -57,9 +57,12 @@ ParameterSignature: ast::ParameterSignature = {
 };
 
 Statement: ast::Statement = {
-    "wire" <r:Range?> <id:Identifier> => ast::Statement::Wire(id, r),
-    
+    "wire" <r:Range?> <id:Identifier> <e:Expression?> => ast::Statement::Wire{name: id, width: r, value: e, io: None},
+    "assign" <id:Identifier> <r:Range?> "=" <e:Expression> ";" => ast::Statement::Assign{lhs: id, width: r, rhs: e},
+    <idi:Identifier> <idm:Identifier> "(" <bs:Comma<Bind> ")" ";" => ast::Statement::Instance{name: idi, module: idm, params_set: bs, ports_set: }
 };
+
+
 
 
 
