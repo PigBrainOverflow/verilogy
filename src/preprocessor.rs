@@ -17,32 +17,35 @@ impl Preprocessor {
         self.inc_dirs.push(String::from(dir));
     }
 
-    pub fn resolve_path(&self, path: &str) -> String {
+    pub fn resolve_path(&self, path: &str) -> Option<String> {
         if path.starts_with('/') {
             // absolute path
-            path.to_string()
+            Some(path.to_string())
         } else {
             // relative path
             // check if the path is in the cwd
             let mut full_path = self.cwd.clone();
-            full_path.push('/').push_str(path);
+            full_path.push('/');
+            full_path.push_str(path);
             if std::path::Path::new(&full_path).exists() {
-                return full_path;
+                return Some(full_path);
             }
             // check if the path is in the include directories
             for dir in &self.inc_dirs {
                 let mut full_path = dir.clone();
-                full_path.push('/').push_str(path);
+                full_path.push('/');
+                full_path.push_str(path);
                 if std::path::Path::new(&full_path).exists() {
-                    return full_path;
+                    return Some(full_path);
                 }
             }
+            None
         }
     }
 
-    pub fn preprocess(&self, top_path: &str, top_src: &mut dyn Read) -> Result<String, String> {
+    pub fn preprocess(&self, top_src: &mut dyn Read) -> Result<String, String> {
         let mut res = String::new();
-        let mut buffered_src = BufReader::new(top_src);
+        let buffered_src = BufReader::new(top_src);
 
         for line in buffered_src.lines() {
             let line = line.map_err(|e| e.to_string())?;
@@ -50,17 +53,21 @@ impl Preprocessor {
                 let path = line.split_whitespace().nth(1)
                     .ok_or("Missing path in `include directive")?;
                 let path = path.trim_matches('"');
-                path = self.resolve_path(&path);
+                let path = self.resolve_path(&path)
+                    .ok_or(format!("Failed to resolve include path: {}", path))?;
                 let mut inc_src = std::fs::File::open(&path)
                     .map_err(|e| format!("Failed to open include file: {}", e))?;
-                let inc_content = self.preprocess(&path, &mut inc_src)?;
+                let inc_content = self.preprocess(&mut inc_src)?;
 
                 // replace the included content in the original source
-                res.push_str(&inc_content).res.push('\n');
+                res.push_str(&inc_content);
+                res.push('\n');
             }
             else {
-                res.push_str(&line).push('\n');
+                res.push_str(&line);
+                res.push('\n');
             }
         }
+        Ok(res)
     }
 }
