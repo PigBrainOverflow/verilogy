@@ -84,6 +84,16 @@ Expression: ast::Expression = {
     <lhs:Expression> "-" <rhs:Expression> => ast::Expression::BinaryArithmeticOperation(Box::new(lhs), ast::BinArithOp::Sub, Box::new(rhs)),
 
     #[precedence(level="4")] #[assoc(side="left")]
+    <lhs:Expression> "<" <rhs:Expression> => ast::Expression::RelationalOperation(Box::new(lhs), ast::RelOp::Lt, Box::new(rhs)),
+    <lhs:Expression> "<=" <rhs:Expression> => ast::Expression::RelationalOperation(Box::new(lhs), ast::RelOp::Le, Box::new(rhs)),
+    <lhs:Expression> ">" <rhs:Expression> => ast::Expression::RelationalOperation(Box::new(lhs), ast::RelOp::Gt, Box::new(rhs)),
+    <lhs:Expression> ">=" <rhs:Expression> => ast::Expression::RelationalOperation(Box::new(lhs), ast::RelOp::Ge, Box::new(rhs)),
+
+    #[precedence(level="5")] #[assoc(side="left")]
+    <lhs:Expression> "==" <rhs:Expression> => ast::Expression::RelationalOperation(Box::new(lhs), ast::RelOp::Eq, Box::new(rhs)),
+    <lhs:Expression> "!=" <rhs:Expression> => ast::Expression::RelationalOperation(Box::new(lhs), ast::RelOp::Neq, Box::new(rhs)),
+
+    #[precedence(level="6")] #[assoc(side="left")]
     <lhs:Expression> "&" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::And, Box::new(rhs)),
     <lhs:Expression> "|" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::Or, Box::new(rhs)),
     <lhs:Expression> "^" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::Xor, Box::new(rhs)),

@@ -81,6 +81,7 @@ pub enum Expression {
     UnaryBitOperation(UnBitOp, Box<Expression>),
     BinaryArithmeticOperation(Box<Expression>, BinArithOp, Box<Expression>),
     UnaryArithmeticOperation(UnArithOp, Box<Expression>),
+    RelationalOperation(Box<Expression>, RelOp, Box<Expression>),
     Slice(Box<Expression>, Range), // TODO: add more expression types, e.g. logic operations, concatenation, etc.
 }
 
@@ -109,6 +110,16 @@ pub enum BinArithOp {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum UnArithOp {
     Neg,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum RelOp {
+    Eq,
+    Neq,
+    Gt,
+    Ge,
+    Lt,
+    Le,
 }
 
 // Implementations
