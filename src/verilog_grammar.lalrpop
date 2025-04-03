@@ -53,291 +53,38 @@ Identifier: ast::Identifier = {
 };
 
 ParameterSignature: ast::ParameterSignature = {
-    "#(" <ps:Comma<Parameter>> ")" => ast::ParameterSignature{params: ps}
+    "#" "(" <ps:Comma<Parameter>> ")" => ast::ParameterSignature{params: ps}
 };
 
 Statement: ast::Statement = {
     "wire" <r:Range?> <id:Identifier> <e:Expression?> => ast::Statement::Wire{name: id, width: r, value: e, io: None},
     "assign" <id:Identifier> <r:Range?> "=" <e:Expression> ";" => ast::Statement::Assign{lhs: id, width: r, rhs: e},
-    <idi:Identifier> <idm:Identifier> "(" <bs:Comma<Bind> ")" ";" => ast::Statement::Instance{name: idi, module: idm, params_set: bs, ports_set: }
+    <idm:Identifier> <idi:Identifier> "(" <pos:Comma<Bind>> ")" ";" => ast::Statement::Instance{name: idi, module: idm, params_set: Vec<Bind>::new(), ports_set: pos},
+    <idm:Identifier> "#" "(" <pas:Comma<Parameter>> ")" <idi:Identifier> "(" <pos:Comma<Bind>> ")" ";" => ast::Statement::Instance{name: idi, module: idm, params_set: pas, ports_set: pos}
 };
 
-
-
-
-
-
-Toplevel: ast::Toplevel = {
-    "module" <i:Ident> "(" <a:EntityArgs> ")" ";" <b:EntityBody> "endmodule" => {
-        ast::Toplevel::Module(i, a, b)
-    },
+Bind: ast::Bind = {
+    "." <id:Identifier> "(" <e:Expression> ")" => ast::Bind{name: id, value: e}
 };
 
-EntityArgs = Comma<EntityArg>;
-
-EntityArg: ast::Arg = {
-    //(r"[^{}]+" "{" Inner "}")* => (),
-    //<d:EntityArgType> <i:Ident> ":" "bit" "[" <a:Num> "]" => (i, d, Some(a.to_i32())),
-    //<d:EntityArgType> <i:Ident> ":" "bit" => (i, d, None),
-    <i:Ident> => (i, None, None),
-    <d:EntityArgType> "[" <a:Num> ":" <b:Num> "]" <i:Ident> => (i, None, None),
+Expression: ast::Expression = {
+    <id:Identifier> => ast::Expression::Identifier(id),
+    r"-?[0-9]+" => ast::Expression::with_constant(<>),
+    <lhs:Expression> "&" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::And, Box::new(rhs)),
+    <lhs:Expression> "|" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::Or, Box::new(rhs)),
+    <lhs:Expression> "^" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::Xor, Box::new(rhs)),
+    <lhs:Expression> "^~" <rhs:Expression> => ast::Expression::BinaryBitOperation(Box::new(lhs), ast::BinBitOp::Xnor, Box::new(rhs)),
+    <lhs:Expression> "+" <rhs:Expression> => ast::Expression::BinaryArithmeticOperation(Box::new(lhs), ast::BinArithOp::Add, Box::new(rhs)),
+    <lhs:Expression> "-" <rhs:Expression> => ast::Expression::BinaryArithmeticOperation(Box::new(lhs), ast::BinArithOp::Sub, Box::new(rhs)),
+    <lhs:Expression> "*" <rhs:Expression> => ast::Expression::BinaryArithmeticOperation(Box::new(lhs), ast::BinArithOp::Mul, Box::new(rhs)),
+    <lhs:Expression> "/" <rhs:Expression> => ast::Expression::BinaryArithmeticOperation(Box::new(lhs), ast::BinArithOp::Div, Box::new(rhs)),
+    <lhs:Expression> "%" <rhs:Expression> => ast::Expression::BinaryArithmeticOperation(Box::new(lhs), ast::BinArithOp::Mod, Box::new(rhs)),
+    "~" <e:Expression> => ast::Expression::UnaryBitOperation(ast::UnBitOp::Not, Box::new(e)),
+    "-" <e:Expression> => ast::Expression::UnaryArithmeticOperation(ast::UnArithOp::Neg, Box::new(e))
+    <e:Expression> <r:Range> => ast::Expression::Slice(Box::new(e), r)
 };
 
-InnerArg: Vec<ast::Arg> = {
-    //(r"[^{}]+" "{" Inner "}")* => (),
-    //<d:EntityArgType> <i:Ident> ":" "bit" "[" <a:Num> "]" => (i, d, Some(a.to_i32())),
-    //<d:EntityArgType> <i:Ident> ":" "bit" => (i, d, None),
-    <d:EntityArgType> <i:Comma<Ident>> => i.into_iter().map(|x| (x, Some(d.clone()), None)).collect::<Vec<_>>(),
-    <d:EntityArgType> "[" <a:Num> ":" <b:Num> "]" <i:Ident> => vec![(i, Some(d.clone()), None)],
-};
-
-EntityArgType: ast::Dir = {
-    "output" => ast::Dir::Output,
-    "input" => ast::Dir::Input,
-};
-
-EntityBody: Vec<ast::Decl> = {
-    <v:(Decl)*> => v,
-};
-
-Ident: ast::Ident = {
-    r"[a-zA-Z_][0-9A-Za-z_]*" => ast::Ident(<>.to_string()),
-};
-
-Num: ast::Expr = {
-    r"\d+" => {
-        let num = <>.to_string().replace("_", "");
-        ast::Expr::Num(i32::from_str(<>).unwrap())
-    },
-    r"[0-9]+'d[0-9_]+" => {
-        let num = <>.to_string().replace("_", "").splitn(2, 'd').nth(1).unwrap().to_string();
-        ast::Expr::Num(i32::from_str_radix(&num, 10).unwrap())
-    },
-    r"[0-9]+'b[01_]+" => {
-        let num = <>.to_string().replace("_", "").splitn(2, 'b').nth(1).unwrap().to_string();
-        ast::Expr::Num(i32::from_str_radix(&num, 2).unwrap())
-    },
-    r"[0-9]+'x[0-9a-fA-F_]+" => {
-        let num = <>.to_string().replace("_", "").splitn(2, 'x').nth(1).unwrap().to_string();
-        ast::Expr::Num(i32::from_str_radix(&num, 16).unwrap())
-    },
-};
-
-Dimensions: Vec<ast::Expr> = {
-  <a:("[" <Num> "]")+> => a,
-};
-
-DefType: bool = {
-  "reg" => true,
-  "wire" => false,
-};
-
-pub Decl: ast::Decl = {
-    <InnerArg> ";" => ast::Decl::InnerArg(<>),
-    <m:DefType> <i:Ident> ";" => {
-        if m {
-            ast::Decl::Reg(i, vec![])
-        } else {
-            ast::Decl::Wire(i, vec![], None)
-        }
-    },
-    <m:DefType> "[" <l:Num> ":" <r:Num> "]" <i:Ident> ";" => {
-        if m {
-            ast::Decl::Reg(i, vec![l, r])
-        } else {
-            ast::Decl::Wire(i, vec![l, r], None)
-        }
-    },
-    <m:DefType> <i:Ident> "=" <v:Expr> ";" => {
-        assert_eq!(m, false, "Cannot declare initial value with mutable def.");
-        ast::Decl::Wire(i, vec![], Some(v))
-    },
-    <m:DefType> <i:Ident> ":" "bit" ";" => {
-        if m {
-            ast::Decl::Reg(i, vec![])
-        } else {
-            ast::Decl::Wire(i, vec![], None)
-        }
-    },
-    <m:DefType> <i:Ident> ":" "bit" "=" <v:Expr> ";" => {
-        assert_eq!(m, false, "Cannot declare initial value with mutable def.");
-        ast::Decl::Wire(i, vec![], Some(v))
-    },
-    <m:DefType> <i:Ident> ":" "bit" <a:Dimensions> ";" => {
-        if m {
-            ast::Decl::Reg(i, a)
-        } else {
-            ast::Decl::Wire(i, a, None)
-        }
-    },
-    <m:DefType> <i:Ident> ":" "bit" <a:Dimensions> "=" <v:Expr> ";" => {
-        assert_eq!(m, false, "Cannot declare initial value with mutable def.");
-        ast::Decl::Wire(i, a, Some(v))
-    },
-    <m:DefType> <i:Ident> ":" "uint" "{" <d:Num?> ".." <a:Num> "}" ";" => {
-        let width = u32::next_power_of_two(a.to_i32() as u32).trailing_zeros();
-        let dims = vec![ast::Expr::Num(width as i32)];
-        if m {
-            ast::Decl::Reg(i, dims)
-        } else {
-            ast::Decl::Wire(i, dims, None)
-        }
-    },
-    <m:DefType> <i:Ident> ":" "uint" "{" <d:Num?> ".." <a:Num> "}" "=" <v:Expr> ";" => {
-        assert_eq!(m, false, "Cannot declare initial value with mutable def.");
-        let width = u32::next_power_of_two(a.to_i32() as u32).trailing_zeros();
-        ast::Decl::Wire(i, vec![ast::Expr::Num(width as i32)], Some(v))
-    },
-    <m:DefType> <i:Ident> "=" <e:Ident> "{" <args:Comma<KeyPair>> "}" ";" => {
-        assert_eq!(m, false, "Cannot declare Entity as mut.");
-        ast::Decl::Let(i, e, args)
-    },
-    "const" <i:Ident> "=" <v:Expr> ";" => {
-        ast::Decl::Const(i, v)
-    },
-    "always" "@(" <edge:Edge> <sig:Ident> ")" <b:CombStatementBlock<"">> => {
-        ast::Decl::Always(ast::EdgeRef(sig, edge), b)
-    },
-};
-
-KeyPair: (ast::Ident, ast::Expr) = {
-    <k:Ident> ":" <v:Expr> => {
-      (k, v)
-    },
-};
-
-Edge: ast::Edge = {
-    "posedge" => ast::Edge::Pos,
-    "negedge" => ast::Edge::Neg,
-};
-
-CombStatements: ast::SeqBlock = {
-    <Semicolon<CombStatement>> => ast::SeqBlock::Block(<>),
-};
-
-CombStatementBlock<I>: ast::SeqBlock = {
-    "begin" <CombStatements> "end" => <>,
-    <CombStatement> if I == "" => ast::SeqBlock::Single(Box::new(<>)),
-};
-
-CombStatement: ast::Seq = {
-    "if" "(" <c:Expr> ")" <t:CombStatementBlock<"I">>
-    <e:("else" <CombStatementBlock<"">>)?> => {
-        ast::Seq::If(c, t, e)
-    },
-    "match" <cond:Expr> "{" <arms:MatchArmComb+> "}" => {
-        ast::Seq::Match(cond, arms)
-    },
-
-    <i:Ident> <b:BlockType> <v:Expr> ";" => {
-        ast::Seq::Set(b, i, v)
-    },
-    <i:Ident> "[" <idx:Expr> "]" <b:BlockType> <v:Expr> ";" => {
-        ast::Seq::SetIndex(b, i, idx, v)
-    },
-    <i:Ident> "[" <from:Expr> ":" <to:Expr> "]" <b:BlockType> <v:Expr> ";" => {
-        ast::Seq::SetRange(b, i, from, to, v)
-    },
-};
-
-MatchArmComb: (Vec<ast::Expr>, ast::SeqBlock) = {
-    <e:Pipe<Literal>> "=>" <s:CombStatement> "," => {
-        (e, ast::SeqBlock::Block(vec![s]))
-    },
-    <e:Pipe<Literal>> "=>" "{" <b:CombStatements> "}" ","? => {
-        (e, b)
-    },
-};
-
-SeqStatements: ast::SeqBlock = {
-    <SeqStatement*> => ast::SeqBlock::Block(<>),
-};
-
-pub SeqStatement: ast::Seq = {
-    "if" <c:Expr> "{" <t:SeqStatements> "}"
-    <clauses:("else" "if" <Expr> "{" <SeqStatements> "}")*>
-    <e:("else" "{" <SeqStatements> "}")?> => {
-        let mut els = e;
-        for (cexpr, cblock) in clauses.into_iter().rev() {
-          els = Some(ast::SeqBlock::Block(vec![ast::Seq::If(cexpr, cblock, els)]));
-        }
-        ast::Seq::If(c, t, els)
-    },
-    "case" <cond:Expr> "{" <arms:MatchArmSeq+> "}" ";"? => {
-        ast::Seq::Match(cond, arms)
-    },
-    <i:Ident> <b:BlockType> <v:Expr> ";" => {
-        ast::Seq::Set(b, i, v)
-    },
-    <i:Ident> "[" <idx:Expr> "]" <b:BlockType> <v:Expr> ";" => {
-        ast::Seq::SetIndex(b, i, idx, v)
-    },
-    <i:Ident> "[" <from:Expr> ":" <to:Expr> "]" <b:BlockType> <v:Expr> ";" => {
-        ast::Seq::SetRange(b, i, from, to, v)
-    },
-};
-
-BlockType: ast::BlockType = {
-    "=" => ast::BlockType::Blocking,
-    "<=" => ast::BlockType::NonBlocking,
-};
-
-MatchArmSeq: (Vec<ast::Expr>, ast::SeqBlock) = {
-    <e:Pipe<Literal>> "=>" <s:SeqStatement> "," => {
-        (e, ast::SeqBlock::Block(vec![s]))
-    },
-    <e:Pipe<Literal>> "=>" "{" <b:SeqStatements> "}" ","? => {
-        (e, b)
-    },
-};
-
-Expr: ast::Expr = {
-    // TODO support "always" blocks
-    "if" <c:Expr> "{" <t:Expr> "}"
-    "else" "{" <e:Expr> "}" => {
-        ast::Expr::Ternary(Box::new(c), Box::new(t), Box::new(e))
-    },
-    <l:Expr> "&&" <r:Expr2> => ast::Expr::Arith(ast::Op::And, Box::new(l), Box::new(r)),
-    <l:Expr> "||" <r:Expr2> => ast::Expr::Arith(ast::Op::Or, Box::new(l), Box::new(r)),
-    <l:Expr> "<<" <r:Expr2> => ast::Expr::Arith(ast::Op::LShift, Box::new(l), Box::new(r)),
-    <l:Expr> ">>" <r:Expr2> => ast::Expr::Arith(ast::Op::RShift, Box::new(l), Box::new(r)),
-    Expr2 => <>,
-};
-
-Expr2: ast::Expr = {
-    <l:Expr2> "==" <r:Expr3> => ast::Expr::Arith(ast::Op::Eq, Box::new(l), Box::new(r)),
-    <l:Expr2> "!=" <r:Expr3> => ast::Expr::Arith(ast::Op::Ne, Box::new(l), Box::new(r)),
-    Expr3 => <>,
-};
-
-Expr3: ast::Expr = {
-    <l:Expr3> "<" <r:Expr4> => ast::Expr::Arith(ast::Op::Lt, Box::new(l), Box::new(r)),
-    <l:Expr3> ">" <r:Expr4> => ast::Expr::Arith(ast::Op::Gt, Box::new(l), Box::new(r)),
-    <l:Expr3> ">=" <r:Expr4> => ast::Expr::Arith(ast::Op::Gte, Box::new(l), Box::new(r)),
-    <l:Expr3> "<=" <r:Expr4> => ast::Expr::Arith(ast::Op::Lte, Box::new(l), Box::new(r)),
-    Expr4 => <>,
-};
-
-Expr4: ast::Expr = {
-    <l:Expr4> "+" <r:Term> => ast::Expr::Arith(ast::Op::Add, Box::new(l), Box::new(r)),
-    <l:Expr4> "-" <r:Term> => ast::Expr::Arith(ast::Op::Sub, Box::new(l), Box::new(r)),
-    <l:Expr4> "*" <r:Term> => ast::Expr::Arith(ast::Op::Mul, Box::new(l), Box::new(r)),
-    <l:Expr4> "|" <r:Term> => ast::Expr::Arith(ast::Op::BinOr, Box::new(l), Box::new(r)),
-    <l:Expr4> "&" <r:Term> => ast::Expr::Arith(ast::Op::BinAnd, Box::new(l), Box::new(r)),
-    Term => <>,
-};
-
-Literal: ast::Expr = {
-    Ident => ast::Expr::Ref(<>),
-    Num => <>,
-};
-
-Term: ast::Expr = {
-    "!" <r:Term> => ast::Expr::Unary(ast::UnaryOp::Not, Box::new(r)),
-    "(" <e:Expr> ")" => e,
-    "{" <v:Expr> ";" <r:Expr> "}" => ast::Expr::Repeat(Box::new(v), Box::new(r)),
-    "{" <v:Comma<Expr>> "}" => ast::Expr::Concat(v),
-    <i:Ident> "[" <l:Expr> ":" <r:Expr> "]" => ast::Expr::Slice(i, Box::new(l), Some(Box::new(r))),
-    <i:Ident> "[" <l:Expr> "]" => ast::Expr::Slice(i, Box::new(l), None),
-    Literal => <>,
+Range: ast::Range = {
+    "[" <start:Expression> "]" => ast::Range{start: start, end: None},
+    "[" <start:Expression> ":" <end:Expression> "]" => ast::Range{start: start, end: Some(end)}
 };

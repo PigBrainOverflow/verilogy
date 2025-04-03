@@ -64,7 +64,7 @@ pub struct Range {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct Bind {   // binds a parameter to an argument
+pub struct Bind {   // binds a parameter to an argument or a port to a wire
     pub name: Identifier,
     pub value: Expression
 }
@@ -73,11 +73,11 @@ pub struct Bind {   // binds a parameter to an argument
 pub enum Expression {
     Identifier(Identifier),
     ConstantInt(i64),
-    String(String),
     BinaryBitOperation(Box<Expression>, BinBitOp, Box<Expression>),
     UnaryBitOperation(UnBitOp, Box<Expression>),
     BinaryArithmeticOperation(Box<Expression>, BinArithOp, Box<Expression>),
-    UnaryArithmeticOperation(UnArithOp, Box<Expression>)
+    UnaryArithmeticOperation(UnArithOp, Box<Expression>),
+    Slice(Box<Expression>, Range)
     // TODO: add more expression types, e.g. logic operations, concatenation, etc.
 }
 
@@ -130,6 +130,12 @@ impl Module {
             params: params.0,
             body
         }
+    }
+}
+
+impl Expression {
+    pub fn with_constant(literal: &str) -> Self {
+        Expression::ConstantInt(literal.parse().unwrap())
     }
 }
 
