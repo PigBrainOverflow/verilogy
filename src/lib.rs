@@ -5,3 +5,4 @@ pub mod ast;
 pub mod builder;
 pub mod parser;
 pub mod preprocessor;
+pub mod ir;

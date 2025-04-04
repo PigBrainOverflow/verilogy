@@ -8,12 +8,13 @@ fn main() {
             input[3:0] b,
             output[3:0] c
         );
-        genvar i;
-        generate
-            for (i = 0; i < 4; i = i + 1) begin: and_gate
-                assign c[i] = a[i] & b[i];
-            end
-        endgenerate
+            genvar i;
+            generate
+                for (i = 0; i < 4; i = i + 1) begin: and_gate
+                    assign c[i] = a[i] & b[i];
+                end
+            endgenerate
+        endmodule
     "#;
     match parser.parse(src) {
         Ok(_) => {
