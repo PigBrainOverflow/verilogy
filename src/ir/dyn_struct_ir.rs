@@ -1,7 +1,9 @@
-use std::rc::Rc;
+use std::{collections::{HashMap, HashSet}, hash::Hash, rc::Rc};
 use super::super::ast;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+// an IR for parameterized netlist structures
+
+#[derive(Debug, Clone, Eq)]
 pub enum ParameterExpression {
     Constant(i32),
     Parameter(String),
@@ -9,7 +11,52 @@ pub enum ParameterExpression {
     Sub(Rc<ParameterExpression>, Rc<ParameterExpression>),
     Mul(Rc<ParameterExpression>, Rc<ParameterExpression>),
     Div(Rc<ParameterExpression>, Rc<ParameterExpression>),
+    Mod(Rc<ParameterExpression>, Rc<ParameterExpression>),
     // we only support the above operations for now
+}
+
+impl PartialEq for ParameterExpression {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ParameterExpression::Constant(a), ParameterExpression::Constant(b)) => a == b,
+            (ParameterExpression::Parameter(a), ParameterExpression::Parameter(b)) => a == b,
+            (ParameterExpression::Add(a1, b1), ParameterExpression::Add(a2, b2)) => std::ptr::eq(a1, a2) && std::ptr::eq(b1, b2),
+            (ParameterExpression::Sub(a1, b1), ParameterExpression::Sub(a2, b2)) => std::ptr::eq(a1, a2) && std::ptr::eq(b1, b2),
+            (ParameterExpression::Mul(a1, b1), ParameterExpression::Mul(a2, b2)) => std::ptr::eq(a1, a2) && std::ptr::eq(b1, b2),
+            (ParameterExpression::Div(a1, b1), ParameterExpression::Div(a2, b2)) => std::ptr::eq(a1, a2) && std::ptr::eq(b1, b2),
+            (ParameterExpression::Mod(a1, b1), ParameterExpression::Mod(a2, b2)) => std::ptr::eq(a1, a2) && std::ptr::eq(b1, b2),
+            _ => false,
+        }
+    }
+}
+
+impl std::hash::Hash for ParameterExpression {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            ParameterExpression::Constant(a) => a.hash(state),
+            ParameterExpression::Parameter(a) => a.hash(state),
+            ParameterExpression::Add(a1, b1) => {
+                std::ptr::hash(a1.as_ref(), state);
+                std::ptr::hash(b1.as_ref(), state);
+            }
+            ParameterExpression::Sub(a1, b1) => {
+                std::ptr::hash(a1.as_ref(), state);
+                std::ptr::hash(b1.as_ref(), state);
+            }
+            ParameterExpression::Mul(a1, b1) => {
+                std::ptr::hash(a1.as_ref(), state);
+                std::ptr::hash(b1.as_ref(), state);
+            }
+            ParameterExpression::Div(a1, b1) => {
+                std::ptr::hash(a1.as_ref(), state);
+                std::ptr::hash(b1.as_ref(), state);
+            }
+            ParameterExpression::Mod(a1, b1) => {
+                std::ptr::hash(a1.as_ref(), state);
+                std::ptr::hash(b1.as_ref(), state);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -28,6 +75,19 @@ pub struct View {
 
 pub struct Zip {
     // add to the last dimension
-    pub left: Rc<BitTensor>,
-    pub right: Rc<BitTensor>,
+    // e.g. zip of two tensors of shape (2, 3) is (2, 3, 2)
+    pub inputs: Vec<Rc<BitTensor>>,
+}
+
+pub struct Module {
+    pub name: String,
+    pub params: HashMap<String, Rc<ParameterExpression>>,
+    pub exprs: HashSet<Rc<ParameterExpression>>,
+    pub tensors: HashSet<Rc<BitTensor>>,
+    pub inputs: HashMap<String, Rc<BitTensor>>,
+    pub outputs: HashMap<String, Rc<BitTensor>>,
+}
+
+pub struct Instance {
+    pub module: Rc<Module>,
 }
