@@ -107,7 +107,51 @@ impl Op for Apply {}
 impl Op for Reduce {}
 
 impl Module {
+    pub fn new(name: &str) -> Self {
+        Module {
+            name: name.to_string(),
+            params: HashMap::new(),
+            exprs: HashSet::new(),
+            tensors: HashSet::new(),
+            inputs: HashMap::new(),
+            outputs: HashMap::new(),
+        }
+    }
+
     pub fn with_ast_module(ast_module: &ast::Module) -> Self {
-        
+        // gather parameters
+        let mut params = HashMap::new();
+        for param in &ast_module.params {
+            params.insert(param.name.0.clone(), Rc::new(ParameterExpression::Parameter(param.name.0.clone())));
+        }
+
+        // gather ports
+        let mut inputs = HashMap::new();
+        let mut outputs = HashMap::new();
+        for statement in &ast_module.body {
+            
+        }
+
+        Module {
+            name: ast_module.name.0.clone(),
+            inputs,
+            outputs,
+        }
+    }
+
+    fn extract_input(&self, &statement: &ast::Statement) -> Option<Rc<BitTensor>> {
+        match statement {
+            ast::Statement::Wire { name, width, init, io } => {
+                if let Some(ast::Io::Input) = io {
+                    let shape = vec![Rc::new(ParameterExpression::Constant(*width))];
+                    let tensor = Rc::new(BitTensor { shape, from: None });
+                    self.inputs.insert(name.0.clone(), tensor.clone());
+                    Some(tensor)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
     }
 }
