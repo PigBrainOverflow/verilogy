@@ -59,27 +59,16 @@ impl std::hash::Hash for ParameterExpression {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct BitTensor {
     // Multi-dimensional tensor of bits
     pub shape: Vec<Rc<ParameterExpression>>,
+    pub from: Option<Rc<dyn Op>>,   // None if it is an input tensor
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct View {
-    // Polyhedral view of a tensor
-    pub shape: Vec<Rc<ParameterExpression>>,    // range of the original indices
-    pub strides: Vec<Vec<i32>>, // including offsets
-    pub tensor: Rc<BitTensor>, // the original tensor
-}
-
-pub struct Zip {
-    // add to the last dimension
-    // e.g. zip of two tensors of shape (2, 3) is (2, 3, 2)
-    pub inputs: Vec<Rc<BitTensor>>,
-}
+pub trait Op {}
 
 pub struct Module {
+    // Signature of the module
     pub name: String,
     pub params: HashMap<String, Rc<ParameterExpression>>,
     pub exprs: HashSet<Rc<ParameterExpression>>,
@@ -88,6 +77,37 @@ pub struct Module {
     pub outputs: HashMap<String, Rc<BitTensor>>,
 }
 
-pub struct Instance {
+pub struct View {
+    // Polyhedral view of a tensor
+    pub shape: Vec<Rc<ParameterExpression>>,    // range of the original indices
+    pub strides: Vec<Vec<i32>>, // including offsets
+    pub input: Rc<BitTensor>, // the original tensor
+}
+
+pub struct Map {
+    // we only support fixed instance whose parameters are known at compile time
     pub module: Rc<Module>,
+    pub inputs: Vec<Rc<BitTensor>>, // inputs to the module
+}
+
+pub struct Apply {
+    // connect an instance to the inputs
+    pub module: Rc<Module>,
+    pub inputs: Vec<Rc<BitTensor>>, // inputs to the module
+}
+
+pub struct Reduce {
+    pub module: Rc<Module>,
+    pub inputs: Vec<Rc<BitTensor>>, // inputs to the module
+}
+
+impl Op for View {}
+impl Op for Map {}
+impl Op for Apply {}
+impl Op for Reduce {}
+
+impl Module {
+    pub fn with_ast_module(ast_module: &ast::Module) -> Self {
+        
+    }
 }
