@@ -1,4 +1,6 @@
-use std::{collections::{HashMap, HashSet}, hash::Hash, rc::Rc};
+use std::{collections::{HashMap, HashSet}, hash::Hash, i32, rc::Rc, vec};
+use crate::ast::Statement;
+
 use super::super::ast;
 
 // an IR for parameterized netlist structures
@@ -20,11 +22,11 @@ impl PartialEq for ParameterExpression {
         match (self, other) {
             (ParameterExpression::Constant(a), ParameterExpression::Constant(b)) => a == b,
             (ParameterExpression::Parameter(a), ParameterExpression::Parameter(b)) => a == b,
-            (ParameterExpression::Add(a1, b1), ParameterExpression::Add(a2, b2)) => std::ptr::eq(a1, a2) && std::ptr::eq(b1, b2),
-            (ParameterExpression::Sub(a1, b1), ParameterExpression::Sub(a2, b2)) => std::ptr::eq(a1, a2) && std::ptr::eq(b1, b2),
-            (ParameterExpression::Mul(a1, b1), ParameterExpression::Mul(a2, b2)) => std::ptr::eq(a1, a2) && std::ptr::eq(b1, b2),
-            (ParameterExpression::Div(a1, b1), ParameterExpression::Div(a2, b2)) => std::ptr::eq(a1, a2) && std::ptr::eq(b1, b2),
-            (ParameterExpression::Mod(a1, b1), ParameterExpression::Mod(a2, b2)) => std::ptr::eq(a1, a2) && std::ptr::eq(b1, b2),
+            (ParameterExpression::Add(a1, b1), ParameterExpression::Add(a2, b2)) => Rc::ptr_eq(a1, a2) && Rc::ptr_eq(b1, b2),
+            (ParameterExpression::Sub(a1, b1), ParameterExpression::Sub(a2, b2)) => Rc::ptr_eq(a1, a2) && Rc::ptr_eq(b1, b2),
+            (ParameterExpression::Mul(a1, b1), ParameterExpression::Mul(a2, b2)) => Rc::ptr_eq(a1, a2) && Rc::ptr_eq(b1, b2),
+            (ParameterExpression::Div(a1, b1), ParameterExpression::Div(a2, b2)) => Rc::ptr_eq(a1, a2) && Rc::ptr_eq(b1, b2),
+            (ParameterExpression::Mod(a1, b1), ParameterExpression::Mod(a2, b2)) => Rc::ptr_eq(a1, a2) && Rc::ptr_eq(b1, b2),
             _ => false,
         }
     }
@@ -72,7 +74,7 @@ pub struct Module {
     pub name: String,
     pub params: HashMap<String, Rc<ParameterExpression>>,
     pub exprs: HashSet<Rc<ParameterExpression>>,
-    pub tensors: HashSet<Rc<BitTensor>>,
+    pub tensors: HashSet<Rc<BitTensor>>,    // TODO: remove this
     pub inputs: HashMap<String, Rc<BitTensor>>,
     pub outputs: HashMap<String, Rc<BitTensor>>,
 }
@@ -101,10 +103,19 @@ pub struct Reduce {
     pub inputs: Vec<Rc<BitTensor>>, // inputs to the module
 }
 
+pub struct Zip {
+    // zip multiple tensors by their last dimension
+    // e.g. zip(<3, 5, 1>, <3, 5, 2>) -> <3, 5, 3>
+    // zip(<3, 5, 1>, <3, 5, 2>, <3, 5, 3>) -> <3, 5, 6>
+    // this means that all previous dimensions are the same
+    inputs: Vec<Rc<BitTensor>>, // inputs to the module
+}
+
 impl Op for View {}
 impl Op for Map {}
 impl Op for Apply {}
 impl Op for Reduce {}
+impl Op for Zip {}
 
 impl Module {
     pub fn new(name: &str) -> Self {
@@ -118,40 +129,44 @@ impl Module {
         }
     }
 
+    fn get_param_const(&mut self, value: i32) -> Rc<ParameterExpression> {
+        // check if the value is already in the set
+        let param = Rc::new(ParameterExpression::Constant(value));
+        if self.exprs.contains(&param) {
+            return param;
+        }
+        self.exprs.insert(param.clone());
+        param
+    }
+
     pub fn with_ast_module(ast_module: &ast::Module) -> Self {
         // gather parameters
-        let mut params = HashMap::new();
+        let mut module = Module::new(&ast_module.name.0);
         for param in &ast_module.params {
-            params.insert(param.name.0.clone(), Rc::new(ParameterExpression::Parameter(param.name.0.clone())));
+            module.params.insert(param.name.0.clone(), Rc::new(ParameterExpression::Parameter(param.name.0.clone())));
         }
 
         // gather ports
-        let mut inputs = HashMap::new();
-        let mut outputs = HashMap::new();
         for statement in &ast_module.body {
-            
+            module.extract_ports(statement);
         }
 
-        Module {
-            name: ast_module.name.0.clone(),
-            inputs,
-            outputs,
-        }
+        module
     }
 
-    fn extract_input(&self, &statement: &ast::Statement) -> Option<Rc<BitTensor>> {
-        match statement {
-            ast::Statement::Wire { name, width, init, io } => {
-                if let Some(ast::Io::Input) = io {
-                    let shape = vec![Rc::new(ParameterExpression::Constant(*width))];
-                    let tensor = Rc::new(BitTensor { shape, from: None });
-                    self.inputs.insert(name.0.clone(), tensor.clone());
-                    Some(tensor)
-                } else {
-                    None
+    fn extract_ports(&mut self, statement: &ast::Statement) {
+        if let ast::Statement::Wire{name, width, init, io} = statement {
+            if let Some(io) = io {  // input or output
+                // convert width into dimensions
+                let mut dims = vec![];
+                if let Some(width) = width {
+
                 }
+                else {  // default to 1
+                    dims.push(Rc::new(ParameterExpression::Constant(1)));
+                }
+
             }
-            _ => None,
         }
     }
 }

@@ -1,0 +1,171 @@
+{
+  "name": "simple_and",
+  "params": [
+    {
+      "name": "WIDTH",
+      "value": {
+        "ConstantInt": 8
+      }
+    }
+  ],
+  "body": [
+    {
+      "Wire": {
+        "name": "a",
+        "width": {
+          "start": {
+            "BinaryArithmeticOperation": [
+              {
+                "Identifier": "WIDTH"
+              },
+              "Sub",
+              {
+                "ConstantInt": 1
+              }
+            ]
+          },
+          "end": {
+            "ConstantInt": 0
+          }
+        },
+        "init": null,
+        "io": "Input"
+      }
+    },
+    {
+      "Wire": {
+        "name": "b",
+        "width": {
+          "start": {
+            "BinaryArithmeticOperation": [
+              {
+                "Identifier": "WIDTH"
+              },
+              "Sub",
+              {
+                "ConstantInt": 1
+              }
+            ]
+          },
+          "end": {
+            "ConstantInt": 0
+          }
+        },
+        "init": null,
+        "io": "Input"
+      }
+    },
+    {
+      "Wire": {
+        "name": "c",
+        "width": {
+          "start": {
+            "BinaryArithmeticOperation": [
+              {
+                "Identifier": "WIDTH"
+              },
+              "Sub",
+              {
+                "ConstantInt": 1
+              }
+            ]
+          },
+          "end": {
+            "ConstantInt": 0
+          }
+        },
+        "init": null,
+        "io": "Output"
+      }
+    },
+    {
+      "Genvar": "i"
+    },
+    {
+      "Generate": [
+        {
+          "For": {
+            "name": "and_gate",
+            "init": {
+              "name": "i",
+              "width": null,
+              "value": {
+                "ConstantInt": 0
+              }
+            },
+            "cond": {
+              "RelationalOperation": [
+                {
+                  "Identifier": "i"
+                },
+                "Lt",
+                {
+                  "Identifier": "WIDTH"
+                }
+              ]
+            },
+            "step": {
+              "name": "i",
+              "width": null,
+              "value": {
+                "BinaryArithmeticOperation": [
+                  {
+                    "Identifier": "i"
+                  },
+                  "Add",
+                  {
+                    "ConstantInt": 1
+                  }
+                ]
+              }
+            },
+            "body": [
+              {
+                "Assign": {
+                  "name": "c",
+                  "width": {
+                    "start": {
+                      "Identifier": "i"
+                    },
+                    "end": null
+                  },
+                  "value": {
+                    "BinaryBitOperation": [
+                      {
+                        "Slice": [
+                          {
+                            "Identifier": "a"
+                          },
+                          {
+                            "start": {
+                              "Identifier": "i"
+                            },
+                            "end": null
+                          }
+                        ]
+                      },
+                      "And",
+                      {
+                        "Slice": [
+                          {
+                            "Identifier": "b"
+                          },
+                          {
+                            "start": {
+                              "Identifier": "i"
+                            },
+                            "end": null
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

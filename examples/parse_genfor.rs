@@ -3,14 +3,17 @@ use verilogy::parser::Parser;
 fn main() {
     let mut parser = Parser::new();
     let src = r#"
-        module simple_and(
-            input[3:0] a,
-            input[3:0] b,
-            output[3:0] c
+        module simple_and #(
+            parameter WIDTH = 8
+        )
+        (
+            input[WIDTH-1:0] a,
+            input[WIDTH-1:0] b,
+            output[WIDTH-1:0] c
         );
             genvar i;
             generate
-                for (i = 0; i < 4; i = i + 1) begin: and_gate
+                for (i = 0; i < WIDTH; i = i + 1) begin: and_gate
                     assign c[i] = a[i] & b[i];
                 end
             endgenerate
@@ -20,7 +23,7 @@ fn main() {
         Ok(_) => {
             println!("Parsed successfully!");
             for (_, module) in parser.modules() {
-                println!("{:?}", module);
+                println!("{}", serde_json::to_string_pretty(&module).unwrap());
             }
         }
         Err(e) => {

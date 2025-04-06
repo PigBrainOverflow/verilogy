@@ -19,7 +19,8 @@ pub TranslationUnit: ast::TranslationUnit = {
 };
 
 Module: ast::Module = {
-    "module" <id:Identifier> <pa:ParameterSignature?> "(" <po:Comma<Port>> ")" ";" <b:Statement*> "endmodule" => ast::Module::with_def(id, pa, po, b)
+    "module" <id:Identifier> "(" <po:Comma<Port>> ")" ";" <b:Statement*> "endmodule" => ast::Module::with_def(id, vec![], po, b),
+    "module" <id:Identifier> "#" "(" <pa:Comma<ParameterInSignature>> ")" "(" <po:Comma<Port>> ")" ";" <b:Statement*> "endmodule" => ast::Module::with_def(id, pa, po, b)
 };
 
 Port: ast::Port = {
@@ -30,10 +31,6 @@ Port: ast::Port = {
 
 Identifier: ast::Identifier = {
     r"[a-zA-Z_][0-9A-Za-z_]*" => ast::Identifier(<>.to_string())
-};
-
-ParameterSignature: ast::ParameterSignature = {
-    "#" "(" <ps:Comma<Parameter>> ")" => ast::ParameterSignature(ps)
 };
 
 Statement: ast::Statement = {
@@ -67,7 +64,7 @@ Expression: ast::Expression = {
     #[precedence(level="0")]
     "(" <e:Expression> ")" => e,
     <id:Identifier> => ast::Expression::Identifier(id),
-    r"-?[0-9]+" => ast::Expression::with_constant(<>),
+    r"[0-9]+" => ast::Expression::with_constant(<>),
     <e:Expression> <r:Range> => ast::Expression::Slice(Box::new(e), r),
 
     #[precedence(level="1")] #[assoc(side="right")]
@@ -108,4 +105,9 @@ Range: ast::Range = {
 Parameter: ast::Parameter = {
     <id:Identifier> "=" <e:Expression> => ast::Parameter{name: id, value: Some(e)},
     <id:Identifier> => ast::Parameter{name: id, value: None}
+};
+
+ParameterInSignature: ast::Parameter = {
+    "parameter" <id:Identifier> "=" <e:Expression> => ast::Parameter{name: id, value: Some(e)},
+    "parameter" <id:Identifier> => ast::Parameter{name: id, value: None}
 };

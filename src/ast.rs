@@ -1,26 +1,28 @@
+use serde::Serialize;
+
 // Simplified AST
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub struct TranslationUnit {
     pub modules: Vec<Module>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub struct Module {
     pub name: Identifier,
     pub params: Vec<Parameter>,
     pub body: Vec<Statement>, // inputs and outputs are included in the body
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub struct Identifier(pub String);
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub struct Parameter {
     pub name: Identifier,
     pub value: Option<Expression>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub enum Statement {
     Wire {
         name: Identifier,
@@ -46,34 +48,34 @@ pub enum Statement {
     }, // TODO: add more statement types
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub struct AssignDecl {
     pub name: Identifier,
     pub width: Option<Range>,
     pub value: Expression,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub enum Direction {
     Input,
     Output,
     InOut,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub struct Range {
     pub start: Box<Expression>,
     pub end: Option<Box<Expression>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub struct Bind {
     // binds a parameter to an argument or a port to a wire
     pub name: Identifier,
     pub value: Expression,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub enum Expression {
     Identifier(Identifier),
     ConstantInt(i64),
@@ -85,7 +87,7 @@ pub enum Expression {
     Slice(Box<Expression>, Range), // TODO: add more expression types, e.g. logic operations, concatenation, etc.
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub enum BinBitOp {
     And,
     Or,
@@ -93,12 +95,12 @@ pub enum BinBitOp {
     Xnor,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub enum UnBitOp {
     Not,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub enum BinArithOp {
     Add,
     Sub,
@@ -107,12 +109,12 @@ pub enum BinArithOp {
     Mod,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub enum UnArithOp {
     Neg,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 pub enum RelOp {
     Eq,
     Neq,
@@ -126,11 +128,10 @@ pub enum RelOp {
 impl Module {
     pub fn with_def(
         id: Identifier,
-        params: Option<ParameterSignature>,
+        params: Vec<Parameter>,
         ports: Vec<Port>,
         mut body: Vec<Statement>,
     ) -> Self {
-        let params = params.unwrap_or(ParameterSignature(vec![]));
         let mut new_body = vec![];
 
         // add ports to the body
@@ -146,7 +147,7 @@ impl Module {
 
         Self {
             name: id,
-            params: params.0,
+            params,
             body: new_body,
         }
     }
@@ -160,9 +161,6 @@ impl Expression {
 
 // Original AST
 // not occurring in the output AST
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct ParameterSignature(pub Vec<Parameter>);
-
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Port {
     pub name: Identifier,
