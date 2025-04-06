@@ -52,6 +52,8 @@ class Module:
                 if isinstance(lhs, Constant) and isinstance(rhs, Constant):
                     expr = Constant(lhs.value * rhs.value)
 
+        # TODO: more rules to check equivalence
+
         # check if the expression is already in the database
         cursor = self._exprs.cursor()
         expr_json = json.dumps(expr.to_json())
@@ -65,7 +67,7 @@ class Module:
         return cursor.lastrowid
 
     def from_ast(self, ast_module: dict):
-        genvars = set()
+        genvars = {}    # current value of genvar
 
         self._name = ast_module["name"]
 
@@ -89,10 +91,74 @@ class Module:
                     raise DynStructIRError(f"Unknown io type: {wire['io']}")
 
             elif "Genvar" in statement: # genvar declaration
-                genvars.add(statement["Genvar"])
+                genvars[statement["Genvar"]] = None # not initialized
 
             elif "Generate" in statement:   # generate block
-                pass
+                for genstatement in statement["Generate"]:
+                    if "For" in genstatement:   # for loop
+                        res = For.from_ast(self, genstatement, genvars)
+
+
+class For:
+    @staticmethod
+    def from_ast(module: Module, forstatement: dict, genvars: dict[str, int | None]):
+        _, init, cond, step, body  = forstatement["For"].values()
+
+        # init
+        genvar_name, _, init_value = init.values()
+        if genvar_name not in genvars:
+            raise DynStructIRError(f"Unknown genvar: {genvar_name}")
+        if init_value is None:
+            if genvars[genvar_name] is None:
+                raise DynStructIRError(f"Uninitialized genvar: {genvar_name}")
+            range_start = genvars[genvar_name]
+        else:
+            range_start = ParameterExpression.from_ast(module, init_value)
+
+        # cond
+        if "RelationalOperation" not in cond:
+            raise DynStructIRError(f"Unknown condition: {cond}")
+        lhs, op, rhs = cond["RelationalOperation"]
+        # we only support genvar at lhs for now
+        if "Identifier" not in lhs:
+            raise DynStructIRError(f"Unexpected identifier: {lhs}")
+        if lhs["Identifier"] != genvar_name:
+            raise DynStructIRError(f"Unexpected genvar: {lhs['Identifier']}")
+        # we only support < for now
+        if op != "Lt":
+            raise DynStructIRError(f"Unknown operation: {op}")
+        range_end = ParameterExpression.from_ast(module, rhs)
+
+        # step
+        name, _, updated_value = step.values()
+        if name != genvar_name:
+            raise DynStructIRError(f"Unexpected genvar: {name}")
+        if "BinaryArithmeticOperation" not in updated_value:
+            raise DynStructIRError(f"Unknown step value: {updated_value}")
+        lhs, op, rhs = updated_value["BinaryArithmeticOperation"]
+        # we only support i + <constant> for now
+        if op != "Add":
+            raise DynStructIRError(f"Unknown operation: {op}")
+        if "Identifier" not in lhs:
+            raise DynStructIRError(f"Unexpected expression: {lhs}")
+        if lhs["Identifier"] != genvar_name:
+            raise DynStructIRError(f"Unexpected genvar: {lhs['Identifier']}")
+        if "ConstantInt" not in rhs:
+            raise DynStructIRError(f"Unexpected expression: {rhs}")
+        step_value = ParameterExpression.from_ast(module, rhs)
+
+        # body
+        # for simplicity, we only support one statement in the body
+        statement = body[0]
+        if "Assign" in statement:
+            # we first check the rhs
+            
+        elif "Instance" in statement:
+            raise NotImplementedError()
+        else:
+            raise DynStructIRError(f"Unknown statement: {statement}")
+
+        return (range_start, range_end, step_value)
 
 
 class ParameterExpression:
@@ -169,6 +235,9 @@ class BitTensor:
 
 class Op:
     pass
+
+class View(Op):
+    _shape: 
 
 
 if __name__ == "__main__":
