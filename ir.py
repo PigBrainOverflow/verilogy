@@ -20,7 +20,7 @@ class Module:
     CREATE_EXPR_TABLE = """
         CREATE TABLE IF NOT EXISTS exprs (
             id INTEGER PRIMARY KEY,
-            value JSON NOT NULL
+            content JSON NOT NULL
         );
     """
 
@@ -36,6 +36,9 @@ class Module:
         self._inputs = {}
         self._outputs = {}
 
+    def __delete__(self):
+        self._exprs.close()
+
     def _get_expr(self, expr: ParameterExpression) -> int:
         # constant folding
         match expr:
@@ -45,26 +48,31 @@ class Module:
             case Sub(lhs, rhs):
                 if isinstance(lhs, Constant) and isinstance(rhs, Constant):
                     expr = Constant(lhs.value - rhs.value)
+            case Mul(lhs, rhs):
+                if isinstance(lhs, Constant) and isinstance(rhs, Constant):
+                    expr = Constant(lhs.value * rhs.value)
 
         # check if the expression is already in the database
         cursor = self._exprs.cursor()
-        expr_json = json.dumps(dataclasses.asdict(expr))
-        cursor.execute("SELECT id FROM exprs WHERE value = ? LIMIT 1", (expr_json,))
+        expr_json = json.dumps(expr.to_json())
+        cursor.execute("SELECT id FROM exprs WHERE content = ? LIMIT 1", (expr_json,))
         result = cursor.fetchone()
         if result:
             return result[0]
-        cursor.execute("INSERT INTO exprs VALUES (?)", (expr_json,))
+        cursor.execute("INSERT INTO exprs (content) VALUES (?)", (expr_json,))
         self._exprs.commit()
+        # print(f"Inserted new expression: {expr_json}")
         return cursor.lastrowid
 
     def from_ast(self, ast_module: dict):
+        genvars = set()
+
         self._name = ast_module["name"]
 
         # initialize parameters
         for param in ast_module["params"]:
-            self._params[param["name"]] = Constant(param["value"])
+            self._get_expr(Parameter(param["name"]))
 
-        # initialize ports
         for statement in ast_module["body"]:
             if "Wire" in statement: # wire declaration
                 wire = statement["Wire"]
@@ -72,6 +80,7 @@ class Module:
                     continue
                 tensor = BitTensor()
                 tensor.from_ast(self, wire)
+                # print(tensor)
                 if wire["io"] in ["Input", "InOut"]:    # we treat InOut as Input for now
                     self._inputs[wire["name"]] = tensor
                 elif wire["io"] == "Output":
@@ -79,24 +88,38 @@ class Module:
                 else:
                     raise DynStructIRError(f"Unknown io type: {wire['io']}")
 
+            elif "Genvar" in statement: # genvar declaration
+                genvars.add(statement["Genvar"])
+
+            elif "Generate" in statement:   # generate block
+                pass
+
 
 class ParameterExpression:
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-        # compare by field addresses if they are ParameterExpressions
-        for field_name, field_value in vars(self).items():
-            other_field_value = getattr(other, field_name)
-            if isinstance(field_value, ParameterExpression) and isinstance(other_field_value, ParameterExpression):
-                if id(field_value) != id(other_field_value):
-                    return False
-            elif field_value != other_field_value:
-                return False
-        return True
+    @staticmethod
+    def from_ast(module: Module, expr: dict) -> int:
+        if "BinaryArithmeticOperation" in expr:
+            lhs, op, rhs = expr["BinaryArithmeticOperation"]
+            lhs = ParameterExpression.from_ast(module, lhs)
+            rhs = ParameterExpression.from_ast(module, rhs)
+            match op:
+                case "Add":
+                    return module._get_expr(Add(lhs, rhs))
+                case "Sub":
+                    return module._get_expr(Sub(lhs, rhs))
+                case "Mul":
+                    return module._get_expr(Mul(lhs, rhs))
+                case _:
+                    raise DynStructIRError(f"Unknown operation: {op}")
+        if "ConstantInt" in expr:
+            return module._get_expr(Constant(expr["ConstantInt"]))
+        if "Identifier" in expr:
+            return module._get_expr(Parameter(expr["Identifier"]))
+        raise DynStructIRError(f"Unknown expression: {expr}")
 
-    def __hash__(self):
-        field_hashes = tuple(sorted((field_name, id(getattr(self, field_name))) for field_name in vars(self)))
-        return hash((self.__class__, field_hashes))
+    def to_json(self) -> dict:
+        return {"type": self.__class__.__name__, **dataclasses.asdict(self)}
+
 
 @dataclasses.dataclass
 class Constant(ParameterExpression):
@@ -108,20 +131,25 @@ class Parameter(ParameterExpression):
 
 @dataclasses.dataclass
 class Add(ParameterExpression):
-    lhs: ParameterExpression
-    rhs: ParameterExpression
+    lhs: int
+    rhs: int
 
 @dataclasses.dataclass
 class Sub(ParameterExpression):
-    lhs: ParameterExpression
-    rhs: ParameterExpression
+    lhs: int
+    rhs: int
+
+@dataclasses.dataclass
+class Mul(ParameterExpression):
+    lhs: int
+    rhs: int
 
 
 class BitTensor:
-    _shape: list[ParameterExpression]
+    _shape: list[int]
     _op: Op | None
 
-    def __init__(self, shape: list[ParameterExpression] = None, op: Op = None):
+    def __init__(self, shape: list[int] = None, op: Op = None):
         self._shape = shape or []
         self._op = op
 
@@ -129,8 +157,14 @@ class BitTensor:
         return f"BitTensor(shape={self._shape}, op={self._op})"
 
     def from_ast(self, module: Module, wire: dict):
+        # it ignores init and io
         if wire["width"] is None:   # 1-bit wire
-            self._shape = [module.]
+            self._shape = [module._get_expr(Constant(1))]
+        else:
+            start, end = wire["width"]["start"], wire["width"]["end"]
+            if end is None or end["ConstantInt"] != 0:
+                raise DynStructIRError("Invalid width for wire")
+            self._shape = [ParameterExpression.from_ast(module, start)]
 
 
 class Op:
@@ -145,3 +179,7 @@ if __name__ == "__main__":
 
     module = Module()
     module.from_ast(ast_module)
+    cur = module._exprs.cursor()
+    cur.execute("SELECT * FROM exprs")
+    for row in cur:
+        print(row)
